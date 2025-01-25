@@ -103,8 +103,10 @@ void computePrimes(int pos) {
     long n = 1;
 
     while (true) {
-        if (isPrime(n))
+        if (isPrime(n)) {
             printAt(n, pos);
+            yield();
+        }
         n++;
     }
 }

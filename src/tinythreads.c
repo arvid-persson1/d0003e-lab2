@@ -8,8 +8,8 @@
 #define ENABLE()        sei()
 #define STACKSIZE       80
 #define NTHREADS        4
-#define SETSTACK(buf, a) *((unsigned int *)(buf)+8) = (unsigned int)(a) + STACKSIZE - 4; \
-                         *((unsigned int *)(buf)+9) = (unsigned int)(a) + STACKSIZE - 4
+#define SETSTACK(buf, a) *((unsigned int*)(buf) + 8) = (unsigned int)(a) + STACKSIZE - 4; \
+                         *((unsigned int*)(buf) + 9) = (unsigned int)(a) + STACKSIZE - 4
 
 struct thread_block {
     void (*function)(int);
@@ -29,12 +29,8 @@ thread freeQ   = threads,
 bool initialized = false;
 
 static void initialize(void) {
-    int i = 0;
-
-    while (i < NTHREADS) {
+    for (int i = 0; i < NTHREADS - 1; i++)
         threads[i].next = &threads[i + 1];
-        i++;
-    }
 
     threads[NTHREADS - 1].next = NULL;
     initialized = true;
@@ -102,7 +98,11 @@ void spawn(void (* function)(int), int arg) {
 }
 
 void yield(void) {
+    // TODO: is this necessary?
+    DISABLE();
 
+    enqueue(current, &readyQ);
+    dispatch(dequeue(&readyQ));
 }
 
 void lock(mutex *m) {
