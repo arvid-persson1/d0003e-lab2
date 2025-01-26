@@ -1,7 +1,10 @@
+#include "tinythreads.h"
+#include "lab1.h"
 #include <setjmp.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
-#include "tinythreads.h"
+
+#define SET(x) (1 << x)
 
 #define NULL            0
 #define DISABLE()       cli()
@@ -33,6 +36,12 @@ static void initialize(void) {
         threads[i].next = &threads[i + 1];
 
     threads[NTHREADS - 1].next = NULL;
+
+    // TODO: part 2 setup
+    EIMSK  = SET(PCIE1);
+    PCMSK1 = SET(PCINT15);
+    initButton();
+
     initialized = true;
 }
 
@@ -78,6 +87,7 @@ void spawn(void (* function)(int), int arg) {
         initialize();
 
     newp = dequeue(&freeQ);
+    // TODO: can interrupts be enabled here?
     newp->function = function;
     newp->arg = arg;
     newp->next = NULL;
@@ -98,11 +108,17 @@ void spawn(void (* function)(int), int arg) {
 }
 
 void yield(void) {
-    // TODO: is this necessary?
     DISABLE();
 
     enqueue(current, &readyQ);
     dispatch(dequeue(&readyQ));
+
+    ENABLE();
+}
+
+ISR(PCINT1_vect) {
+    if (!(PINB & SET(PORTB7)))
+        yield();
 }
 
 void lock(mutex *m) {
