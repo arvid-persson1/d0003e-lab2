@@ -1,10 +1,9 @@
 #include "tinythreads.h"
 #include "lab1.h"
 #include <setjmp.h>
+#include <stdint.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
-
-#define SET(x) (1 << x)
 
 #define NULL            0
 #define DISABLE()       cli()
@@ -13,6 +12,9 @@
 #define NTHREADS        4
 #define SETSTACK(buf, a) *((unsigned int*)(buf) + 8) = (unsigned int)(a) + STACKSIZE - 4; \
                          *((unsigned int*)(buf) + 9) = (unsigned int)(a) + STACKSIZE - 4
+
+#define SET(x) (1 << x)
+static const uin16_t FREQ = 8000000 / 1024 * 0.05;
 
 struct thread_block {
     void (*function)(int);
@@ -37,11 +39,31 @@ static void initialize(void) {
 
     threads[NTHREADS - 1].next = NULL;
 
+    // Part 2 step 1 init:
+
     // PCIE1: enable PCINT(15:8) interrupts.
     EIMSK  = SET(PCIE1);
     // PCIN15: enable PCINT15 interrupt.
     PCMSK1 = SET(PCINT15);
     initButton();
+    
+    // Part 2 step 2 init:
+    // COM1A(1:0): set OC1A on compare match.
+    TCCR1A = SET(COM1A1) | SET(COM1A0);
+    // WGM1(3:2): CTC mode.
+    // CS1(2:0): 1024 prescaling factor.
+    TCCR1B = SET(WGM12)  | SET(CS12) | SET(CS10);
+    // OCIE1A: output comparison A enabled.
+    TIMSK1 = SET(OCIE1A);
+
+    // See ATmega169 manual on writing to 16-bit registers.
+    uint8_t sreg = SREG;
+    __disable_interrupt();
+    // OCR1A(:): counter comparison A value.
+    OCR1A  = FREQ;
+    // Reset timer.
+    TCNT1  = 0;
+    SREG = sreg;
 
     initialized = true;
 }
@@ -62,12 +84,11 @@ static void enqueue(thread p, thread *queue) {
 static thread dequeue(thread *queue) {
     thread p = *queue;
 
-    if (*queue) {
+    if (*queue)
         *queue = (*queue)->next;
-    } else {
+    else
         // Empty queue-- panic.
         while (true);
-    }
 
     return p;
 }
@@ -117,9 +138,15 @@ void yield(void) {
     ENABLE();
 }
 
+// Joystick input.
 ISR(PCINT1_vect) {
     if (!(PINB & SET(PORTB7)))
         yield();
+}
+
+// Timer.
+ISR(TIMER1_COMPA_vect) {
+    yield();
 }
 
 void lock(mutex *m) {
