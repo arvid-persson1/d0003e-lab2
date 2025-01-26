@@ -5,9 +5,15 @@
 #include <stdint.h>
 #include <avr/io.h>
 
+int pp;
+Mutex m;
+
 void printAt(long num, int pos) {
-    writeChar(num % 100 / 10 + '0', pos);
-    writeChar(num % 10 + '0', pos + 1);
+    lock(&m);
+    pp = pos;
+    writeChar(num % 100 / 10 + '0', pp++);
+    writeChar(num % 10 + '0', pp);
+    unlock(&m);
 }
 
 void computePrimes(int pos) {

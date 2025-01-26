@@ -16,18 +16,18 @@
 #define SET(x) (1 << x)
 static const uint16_t FREQ = 8000000 / 1024 * 0.05;
 
-struct thread_block {
+struct ThreadBlock {
     void (*function)(int);
     int arg;
-    thread next;
+    Thread next;
     jmp_buf context;
     char stack[STACKSIZE];
 };
 
-struct thread_block threads[NTHREADS],
-                    initp;
+struct ThreadBlock threads[NTHREADS],
+                   initp;
 
-thread freeQ   = threads,
+Thread freeQ   = threads,
        readyQ  = NULL,
        current = &initp;
 
@@ -67,21 +67,21 @@ static void initialize(void) {
     initialized = true;
 }
 
-static void enqueue(thread p, thread *queue) {
+static void enqueue(Thread p, Thread *queue) {
     p->next = NULL;
 
     if (*queue == NULL) {
         *queue = p;
     } else {
-        thread q = *queue;
+        Thread q = *queue;
         while (q->next)
             q = q->next;
         q->next = p;
     }
 }
 
-static thread dequeue(thread *queue) {
-    thread p = *queue;
+static Thread dequeue(Thread *queue) {
+    Thread p = *queue;
 
     if (*queue)
         *queue = (*queue)->next;
@@ -92,7 +92,7 @@ static thread dequeue(thread *queue) {
     return p;
 }
 
-static void dispatch(thread next) {
+static void dispatch(Thread next) {
     if (setjmp(current->context) == 0) {
         current = next;
         longjmp(next->context, 1);
@@ -100,7 +100,7 @@ static void dispatch(thread next) {
 }
 
 void spawn(void (* function)(int), int arg) {
-    thread newp;
+    Thread newp;
 
     DISABLE();
 
@@ -117,6 +117,7 @@ void spawn(void (* function)(int), int arg) {
         ENABLE();
         current->function(current->arg);
         DISABLE();
+
         enqueue(current, &freeQ);
         dispatch(dequeue(&readyQ));
     }
@@ -148,10 +149,28 @@ ISR(TIMER1_COMPA_vect) {
     yield();
 }
 
-void lock(mutex *m) {
+void lock(Mutex *m) {
+    DISABLE();
+    
+    if (m->locked) {
+        enqueue(current, &m->waitQ);
+        dispatch(dequeue(&readyQ));
+    } else {
+        m->locked = true;
+    }
 
+    ENABLE();
 }
 
-void unlock(mutex *m) {
+void unlock(Mutex *m) {
+    DISABLE();
 
+    if (m->waitQ) {
+        enqueue(current, &readyQ);
+        dispatch(dequeue(&m->waitQ));
+    } else {
+        m->locked = false;
+    }
+
+    ENABLE();
 }
