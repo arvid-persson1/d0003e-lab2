@@ -14,7 +14,7 @@
                          *((unsigned int*)(buf) + 9) = (unsigned int)(a) + STACKSIZE - 4
 
 #define SET(x) (1 << x)
-static const uin16_t FREQ = 8000000 / 1024 * 0.05;
+static const uint16_t FREQ = 8000000 / 1024 * 0.05;
 
 struct thread_block {
     void (*function)(int);
@@ -56,14 +56,13 @@ static void initialize(void) {
     // OCIE1A: output comparison A enabled.
     TIMSK1 = SET(OCIE1A);
 
-    // See ATmega169 manual on writing to 16-bit registers.
-    uint8_t sreg = SREG;
-    __disable_interrupt();
+    // Interrupts must be disabled when accessing 16-bit registers.
+    DISABLE();
     // OCR1A(:): counter comparison A value.
     OCR1A  = FREQ;
     // Reset timer.
     TCNT1  = 0;
-    SREG = sreg;
+    ENABLE();
 
     initialized = true;
 }
