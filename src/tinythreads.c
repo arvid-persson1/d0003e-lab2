@@ -37,8 +37,9 @@ static void initialize(void) {
 
     threads[NTHREADS - 1].next = NULL;
 
-    // TODO: part 2 setup
+    // PCIE1: enable PCINT(15:8) interrupts.
     EIMSK  = SET(PCIE1);
+    // PCIN15: enable PCINT15 interrupt.
     PCMSK1 = SET(PCINT15);
     initButton();
 
